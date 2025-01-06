@@ -3,9 +3,10 @@ import re
 import pandas as pd
 
 class SQL_operators:
-    predicatesList = []
-    whyNotList = []
-    predAttrList = []
+    def __init__(self):
+        self.predicatesList = []
+        self.whyNotList = []
+        self.predAttrList = []
 
     '''def filter(self, type, df1, column1, condition1, column2 = None, condition2 = None):
         pattern = r'([><=]=?)\s+([A-Za-z\d.]+)'
