@@ -558,7 +558,7 @@ def whyNotProperty_german(df):
     return op.getUserWhyNot()
 
 def main():
-    '''
+    
     #ACSIncome_update_att = ACSIncome_update()
     #ACSIncome_update_att.att_update("WKHP", 35)
     # Define the possible configurations
@@ -640,7 +640,7 @@ def main():
                                 count +=1
     
     
-    
+    '''
     #graph.generate_all_graphs(name)
     #graph.GeneratGraph_Find_Result_Percent(name, directory_path)
     #graph.constraint_width(name, directory_path)
@@ -700,7 +700,7 @@ def main():
     
     # File path to the dataset
     
-    '''
+    
     directory_path = '/Users/Shatha/Downloads/Query_Refinment_Shatha/sh_Final2/Time_vs_Constraints_A'  # Update this to your directory path
     graph = genGraph(directory_path)
     
@@ -712,7 +712,7 @@ def main():
         #inv_graphs.plot_time_by_constraint_Distance(m)
         #inv_graphs.plot_time_by_constraint_Num_Solutions(m)
         #inv_graphs.plot_time_by_constraint_Width(m)
-    
+    '''
 if __name__ == '__main__':
 
     main()
