@@ -1,89 +1,120 @@
 from collections import defaultdict
-from unittest import skip
+from multiprocessing import Condition
+#from statistics import correlation
 import pandas as pd
 import time
 from constraint_evaluation1 import constraint_evaluation1
 from operators import operators
 from filtered_fully import filtered_fully
 from constraint_evaluation import constraint_evaluation
+from itertools import product, tee
+import heapq
+import os
 
-
-
-class filtered_with_Ranges:
+class filtered_with_Ranges_generalize_topK1:
     def __init__(self):
-        # Initialization code here
+        self.distance_cache = {}
         self.applyOperator = operators()
         self.evaluate_constraint1 = constraint_evaluation1()  
         self.evaluate_constraint = constraint_evaluation()
-        self.filter_fully =  filtered_fully()
+        self.filter_fully = filtered_fully()
 
-    def divide_range(self, condition1Range, condition2Range, concrete_values1, concrete_values2):
-        new_ranges1 = []
-        new_ranges2 = []
-        
-        cond1_min, cond1_max = condition1Range
-        cond2_min, cond2_max = condition2Range
-        
-        # Divide condition1 range
-        if cond1_max - cond1_min > 0:
-            mid_point1 = (cond1_min + cond1_max) // 2
-            range1_left = (cond1_min, mid_point1)
-            range1_right = (mid_point1 + 1, cond1_max)
+    def calculate(self, value1, value2):
+        """
+        Caching and calculating the distance between two values.
+        """
+        if (value1, value2) not in self.distance_cache:
+            self.distance_cache[(value1, value2)] = abs(value1 - value2)
+        return self.distance_cache[(value1, value2)]
 
-            # Filter concrete values for each new range
-            concrete_in_range1_left = [val for val in concrete_values1 if range1_left[0] <= val <= range1_left[1]]
-            concrete_in_range1_right = [val for val in concrete_values1 if range1_right[0] <= val <= range1_right[1]]
+    def divide_ranges(self, conditions_ranges):
+        """
+        Divides each condition's range into two halves if possible.
+        """
+        new_ranges_list = []
 
-            # Append the new range if it contains concrete values
-            if concrete_in_range1_left != []:
-                new_ranges1.append({'range': range1_left, 'concrete_values': concrete_in_range1_left})
-            if concrete_in_range1_right != []:
-                new_ranges1.append({'range': range1_right, 'concrete_values': concrete_in_range1_right})
+        for condition_range in conditions_ranges:
+            # Extract condition_range values from a dictionary
+            cond_min, cond_max = condition_range['range']
+            # Divide range
+            if cond_max - cond_min > 0:
+                mid_point = (cond_min + cond_max) // 2
+                new_ranges_list.append([
+                    {'range': (cond_min, mid_point)}, 
+                    {'range': (mid_point + 1, cond_max)}
+                ])
+
+            else:
+                new_ranges_list.append([{'range': (cond_min, cond_max)}])
+        return new_ranges_list
+
+    def generalized_concrete_values(self, combination_time, satisfied, type, concrete_counter, Concrete_values_list, UserpredicateList, refinement_tuples):
+        #start_time = time.time()
+        # Use itertools.product to generate the Cartesian product of all lists in concrete_values
+        if type == 'full':
+            if tuple(satisfied['conditions']) in refinement_tuples:
+                conditions_tuple = satisfied['conditions']  # (418, 8, 5)
+                total_distance = sum(self.calculate(conditions_tuple[i], predicate[2]) for i, predicate in enumerate(UserpredicateList))
+                
+                # Prepare the new row and append
+                Concrete_values_list.append({
+                    'conditions': tuple(satisfied['conditions']),
+                    "Similarity": total_distance,
+                    'Result': satisfied['Result']
+                })
+                concrete_counter += 1
+
         else:
-            # If the range cannot be split, store the entire range with its concrete values
-            concrete_in_range1 = [val for val in concrete_values1 if cond1_min <= val <= cond1_max]
-            if concrete_in_range1 != []:
-                new_ranges1.append({'range': (cond1_min, cond1_max), 'concrete_values': concrete_in_range1})
+            filtered_refinement_tuples = refinement_tuples
+                
+            # Step 1: Loop dynamically through all 'condition' keys in the satisfied dictionary
+            i = 1
+            while f'condition{i}' in satisfied:
+                condition_key = f'condition{i}'
+                condition_value = satisfied[condition_key]  # Access the range (min, max)
+                
+                # Filter refinement tuples based on the current condition's range
+                filtered_refinement_tuples = [
+                    tuple_value for tuple_value in filtered_refinement_tuples
+                    if condition_value[0] <= tuple_value[i - 1] <= condition_value[1]  # Check that the tuple value for this condition is in range
+                ]
+                
+                # Exit early if no combinations left
+                if not filtered_refinement_tuples:
+                    break
+                
+                i += 1
 
-        # Divide condition2 range
-        if cond2_max - cond2_min > 0:
-            mid_point2 = (cond2_min + cond2_max) // 2
-            range2_left = (cond2_min, mid_point2)
-            range2_right = (mid_point2 + 1, cond2_max)
+            # Step 2: For each tuple in the filtered refinement tuples, calculate the similarity
+            for combination in filtered_refinement_tuples:
+                # Calculate similarity for each combination
+                total_similarity = sum(self.calculate(combination[j], UserpredicateList[j][2]) for j in range(len(combination)))
+                # Prepare the new row and append
+                Concrete_values_list.append({
+                    'conditions': combination,
+                    "Similarity": total_similarity,
+                    'Result': satisfied['Result']
+                })
+                concrete_counter += 1
 
-            # Filter concrete values for each new range
-            concrete_in_range2_left = [val for val in concrete_values2 if range2_left[0] <= val <= range2_left[1]]
-            concrete_in_range2_right = [val for val in concrete_values2 if range2_right[0] <= val <= range2_right[1]]
+        #combination_time += time.time() - start_time
+        return Concrete_values_list, concrete_counter, combination_time
 
-            # Append the new range if it contains concrete values
-            if concrete_in_range2_left != []:
-                new_ranges2.append({'range': range2_left, 'concrete_values': concrete_in_range2_left})
-            if concrete_in_range2_right != []:
-                new_ranges2.append({'range': range2_right, 'concrete_values': concrete_in_range2_right})
-        else:
-            # If the range cannot be split, store the entire range with its concrete values
-            concrete_in_range2 = [val for val in concrete_values2 if cond2_min <= val <= cond2_max]
-            if concrete_in_range2 != []:
-                new_ranges2.append({'range': (cond2_min, cond2_max), 'concrete_values': concrete_in_range2})
+
+    def check_predicates(self, statistical_tree, all_pred_possible_Ranges, sorted_possible_refinments, expression, datasize, dataName, result_num, UserpredicateList, query_num, constraint, combination, distribution, Correlation, constraint_type):
+        Concrete_values_list = []
+        combination_time = 0
+        solutions_count = 0
+        Division_time, full_time, single_time, processing_time1, processing_time2 = 0, 0, 0, 0, 0
+        agg_counter, counter, child_counter, check_counter, refinement_counter, concrete_counter = 0, 0, 0, 0, 0, 0
+
+        # Use a dictionary or a pre-sorted structure for fast range-based lookups
+        refinement_tuples = [tuple(r['value'] for r in refinement['refinements']) for refinement in sorted_possible_refinments]
+        refinement_tuples = set(refinement_tuples)  # Convert the list to a set
         
-        return new_ranges1, new_ranges2
-
-
-    def check_predicates(self, statistical_tree, all_pred_possible_Ranges, expression, sorted_possible_refinments1, datasize, dataName):
-        satisfied_conditions = []
-        Concrete_values = []
-        agg_counter = 0
-        counter = 0
-        child_counter = 0
-        ranges_counter = 0
-        found = False
-        check_counter = 0
-        refinement_counter = 0
-
         # Create dictionaries for parent-child relationships and cluster info
         parent_child_map = defaultdict(list)
         cluster_map = {}
-        Concrete_values = []
 
         for row in statistical_tree:
             parent_key = (row['Parent level'], row['Parent cluster'])
@@ -94,244 +125,273 @@ class filtered_with_Ranges:
         # Find the root clusters (clusters with Parent level 0)
         root_clusters = [(row['Level'], row['Cluster Id']) for row in statistical_tree if row['Parent level'] == 0]
 
-        start_time = time.time() 
+        # Extract conditions and operators
+        predicates = all_pred_possible_Ranges
+        operators_list = [p['operator'] for p in predicates]
+
+        # Generate all combinations of ranges for each predicate
+        combinations = list(product(*[pred['values'] for pred in predicates]))
+
+        priority_queue = []
+        index = 0  # This index will be used to avoid comparing dictionaries
+
+        priority_queue = []
         
-        # Extract the first and second predicates
-        first_predicate = all_pred_possible_Ranges[0]
-        second_predicate = all_pred_possible_Ranges[1]
+        for index, current_ranges in enumerate(combinations):
+            min_distance = sum(c_range['min_distance'] for c_range in current_ranges)
+            sum_min_distance = 0
+            for c_range in current_ranges:
+                # Only sum when the ranges are not equal
+                sum_min_distance += c_range['min_distance']
+            heapq.heappush(priority_queue, (sum_min_distance, index, current_ranges))
+            #print(current_ranges)
+            #print(sum_min_distance)
+            index += 1
+        
+        start_time = time.time()
+        # Process ranges based on priority (smallest min_distance first)
+        while priority_queue:
+            processing_start_time1 = time.time()
+            
+            next_range_min_distance = 0
 
-        # Get operators
-        operator1 = first_predicate['operator']
-        operator2 = second_predicate['operator']
+            min_distance, indx, current_ranges = heapq.heappop(priority_queue)
+            #print("Current: ", current_ranges)
+            if priority_queue:
+                # Peek the next item in the priority queue without removing it
+                next_range_min_distance, indx, next_ranges = priority_queue[0]  # Peek the smallest element
+                #print("Next: ", next_ranges)
+            #ranges_counter += 1
+            filtered_clusters = []
 
-        # Loop over all ranges for each predicate
-        for condition1, concrete_values1 in zip(first_predicate['values'], first_predicate['Concrete Vlaues']):
-            if found == True:
-                break
-            if concrete_values1 == []:
-                continue
-            for condition2, concrete_values2 in zip(second_predicate['values'], second_predicate['Concrete Vlaues']):
-                if concrete_values2 == []:
-                    continue
-                if found == True:
-                    break
-                ranges_counter += 1
-                filtered_clusters = []
+            if any(r['range'][0] != r['range'][1] for r in current_ranges):
+                processing_time1 += (time.time() - processing_start_time1)
+                full_start_time = time.time()
 
                 for root_key in root_clusters:
-                    filtered_clusters, counter, child_counter = self.filter_clusters_partial_modified(
+                    filtered_clusters_list_df, counter, child_counter = self.filter_clusters_partial_modified(
                         root_key, parent_child_map, cluster_map, filtered_clusters,
-                        condition1, operator1, condition2, operator2, counter, child_counter)
-
-                # Display the filtered clusters
-                filtered_clusters_list_df = pd.DataFrame(filtered_clusters)
-                #satisfied, agg_counter = self.evaluate_constraint.cardinality(filtered_clusters_list_df, counter, agg_counter, condition1, condition2)
-                check_counter +=1 
-                satisfied, agg_counter = self.evaluate_constraint1.calculate_expression_partially(filtered_clusters_list_df, condition1, condition2, agg_counter, 
-                expression, "ranges",  "similarity", concrete_values1, concrete_values2)   
-
+                        current_ranges, operators_list, counter, child_counter)
                 
-                #filename = f'filtered_Ranges_{condition1}_{condition2}.csv'
-                #filename = filename.replace(" ", "_").replace(",", "_")
-                # Save to CSV
-                #filtered_clusters_list_df.to_csv(filename, index=False)  
-
-                if satisfied != [] and satisfied['Range Satisfaction'] == 'Full':
-                        refinement_counter += 1
-                        satisfied_conditions.append(satisfied)
-                        for concrete_value1 in satisfied['Concrete Vlaues1']:
-                            for concrete_value2 in satisfied['Concrete Vlaues2']:
-                                for refinment in sorted_possible_refinments1:
-                                    if concrete_value1 == refinment['refinements'][0]['value']:
-                                        if concrete_value2 == refinment['refinements'][1]['value']:
-                                            Concrete_values.append({"condition1": concrete_value1, "condition2": concrete_value2, 
-                                            "Result": satisfied['Result'], "Similarity": refinment['distance']})
-
-                                            #if len(Concrete_values) == 40:
-                                                #found = True
-                                                #break
+                check_counter += 1
+                satisfied, agg_counter, not_satisfied, Range_Result = self.evaluate_constraint1.calculate_expression_partially(
+                    filtered_clusters_list_df, current_ranges, agg_counter, expression, "ranges", "similarity", constraint_type, " ")
+                #print(satisfied, "---------------")
+                if satisfied and satisfied['Range Satisfaction'] == 'Full':
+                    #print("SATISFY")
+                    refinement_counter += 1
+                    Concrete_values_list, concrete_counter, combination_time = self.generalized_concrete_values(combination_time, 
+                    satisfied, "range", concrete_counter, Concrete_values_list, UserpredicateList, refinement_tuples)
                     
-                elif satisfied != [] and satisfied['Range Satisfaction'] == 'Partial':
-                        new_satisfactions = [(condition1, condition2)]
+                    full_time += (time.time() - full_start_time)
+                
+                elif satisfied and satisfied['Range Satisfaction'] == 'Partial':
+                        full_time += (time.time() - full_start_time)
+                        #print("Here divide")
+                        p_start_time = time.time()
+                        new_conditions = self.divide_ranges(current_ranges)
+                        #print("Division:", new_conditions)
 
-                        while new_satisfactions:
-                            #if found == True:
-                                #break
-                            current_condition1, current_condition2 = new_satisfactions.pop(0)
+                        # Loop over all combinations of ranges for each predicate
+                        for new_range_set in product(*new_conditions):
+                            sum_min_distance = 0
+                            filtered_clusters = []
+                            updated_range_set = []
+                            found = True
+                                
+                            # Loop through each range in the new divided condition (new_range_set)
+                            for range_index, current_range in enumerate(new_range_set):
+                                
+                                # Find the minimum value in refinement_tuples that falls within the current range
+                                matching_values = list({
+                                    tuple_value[range_index] for tuple_value in refinement_tuples
+                                    if current_range['range'][0] <= tuple_value[range_index] <= current_range['range'][1]
+                                })
+                                
+                                if matching_values:  
+                                    # Extract the user query value for this predicate
+                                    user_value = UserpredicateList[range_index][2]
+                                    
+                                    # Calculate the minimum distance from the user query value to any matching value
+                                    min_distance = min(abs(value - user_value) for value in matching_values)
+                                    
+                                    updated_range_set.append({'range': current_range['range'], 'min_distance': min_distance})
 
-                            new_condition1, new_condition2 = self.divide_range(current_condition1, current_condition2, concrete_values1, concrete_values2)
+                                else:
+                                    found = False
 
-                            for range1 in new_condition1:
-                                if found == True:
-                                    break
-                                for range2 in new_condition2:
-                                    if found == True:
-                                        break
-                                    ranges_counter+=1
-                                    filtered_clusters = []
-                                    if (range1['range'][0] != range1['range'][1]) or (range2['range'][0] != range2['range'][1]):
-                                        for root_key in root_clusters:
-                                            filtered_clusters, counter, child_counter = self.filter_clusters_partial_modified(
-                                                root_key, parent_child_map, cluster_map, filtered_clusters, range1['range'], operator1, range2['range'], operator2, counter, child_counter)
-                                                        
-                                        filtered_clusters_list_df = pd.DataFrame(filtered_clusters)
-                                        #new_satisfied, agg_counter = self.evaluate_constraint.cardinality(filtered_clusters_list_df, counter, agg_counter, range1['range'], range2['range'])
-                                        check_counter +=1 
-                                        new_satisfied, agg_counter = self.evaluate_constraint1.calculate_expression_partially(filtered_clusters_list_df, range1['range'], range2['range'], agg_counter, expression,  "ranges", 
-                                        " ", range1['concrete_values'], range2['concrete_values'])
-                                            
-                                        r1 = range1['range']
-                                        r2 = range2['range']
-                                        
-                                        #filename = f'filtered_Ranges_{r1}_{r2}.csv'
-                                        #filename = filename.replace(" ", "_").replace(",", "_")
-                                        # Save to CSV
-                                        #filtered_clusters_list_df.to_csv(filename, index=False) 
+                            if found:                      
+                                for c_range in updated_range_set:
+                                    # Only sum when the ranges are not equal
+                                    sum_min_distance += c_range['min_distance']
+                                
+                                # Push new_range_set to the priority queue sorted by similarity
+                                heapq.heappush(priority_queue, (sum_min_distance, index, updated_range_set))
+                                index += 1
+                        Division_time += (time.time() - p_start_time)
+            else: # If the range is minimal, no need to divide and filter fully
+                single_start_time = time.time()
+                filtered_clusters = []
+                for root_key in root_clusters:
+                    filtered_clusters_list_df, counter = self.filter_fully.filter_clusters_Hash(
+                        root_key, cluster_map, [range['range'][0] for range in current_ranges], operators_list, 
+                        filtered_clusters, counter, parent_child_map)
 
-                                        if new_satisfied != [] and new_satisfied['Range Satisfaction'] == 'Full':
-                                            refinement_counter += 1
-                                            satisfied_conditions.append(new_satisfied)
-                                            for concrete_value1 in new_satisfied['Concrete Vlaues1']:
-                                                for concrete_value2 in new_satisfied['Concrete Vlaues2']:
-                                                    for refinment in sorted_possible_refinments1:
-                                                        if concrete_value1 == refinment['refinements'][0]['value']:
-                                                            if concrete_value2 == refinment['refinements'][1]['value']:
-                                                                Concrete_values.append({"condition1": concrete_value1, "condition2": concrete_value2, 
-                                                                "Result": new_satisfied['Result'], "Similarity": refinment['distance']})
+                check_counter += 1
+                satisfied, agg_counter, Not_satisfied, result = self.evaluate_constraint.evaluate_constraint1(
+                    filtered_clusters, expression, [range['range'][0] for range in current_ranges], agg_counter, " ",
+                    "ranges", constraint_type)
+                if satisfied != []:
+                    #print("SATISFY")
+                    refinement_counter += 1
+                    Concrete_values_list, concrete_counter,combination_time = self.generalized_concrete_values(combination_time, satisfied, "full", 
+                    concrete_counter, Concrete_values_list, UserpredicateList, refinement_tuples)
+                single_time += (time.time() - single_start_time)    
+            
+            if next_ranges != None:
+                processing_start_time2 = time.time()
+                if Concrete_values_list != []:                    
+                    if Concrete_values_list:
+                        seen = set()
+                        unique_concrete_values = []
 
-                                                                #if len(Concrete_values) == 40:
-                                                                    #found = True
-                                                                    #break
-
-                                        elif new_satisfied != [] and new_satisfied['Range Satisfaction'] == 'Partial':
-                                            new_satisfactions.append((range1['range'], range2['range']))
-
-                                    else: #if the range is minimal, no need to divide and filter fully
-                                        filtered_clusters = []
-                                        for root_key in root_clusters:
-                                            filtered_clusters, counter = self.filter_fully.filter_clusters_Hash(root_key, cluster_map, range1['range'][0], operator1, range2['range'][0], operator2, 
-                                            filtered_clusters, counter, parent_child_map)
-                                        
-                                        filtered_clusters_list_df = pd.DataFrame(filtered_clusters)
-
-                                        check_counter +=1 
-                                        satisfied, agg_counter = self.evaluate_constraint.evaluate_constraint(filtered_clusters, expression, range1['range'][0], range2['range'][0], agg_counter, " ",
-                                            "ranges", range1['concrete_values'], range2['concrete_values'])
-                                        r1 = range1['range'][0]
-                                        r2 = range2['range'][0]
-                                        
-                                        #filename = f'filtered_Ranges_{r1}_{r2}.csv'
-                                        #filename = filename.replace(" ", "_").replace(",", "_")
-                                        # Save to CSV
-                                        #filtered_clusters_list_df.to_csv(filename, index=False) 
-                                        
-                                        if satisfied != []:
-                                            refinement_counter += 1
-                                            satisfied_conditions.append(satisfied)
-                                            for concrete_value1 in satisfied['Concrete Vlaues1']:
-                                                for concrete_value2 in satisfied['Concrete Vlaues2']:
-                                                    for refinment in sorted_possible_refinments1:
-                                                        if concrete_value1 == refinment['refinements'][0]['value']:
-                                                            if concrete_value2 == refinment['refinements'][1]['value']:
-                                                                Concrete_values.append({"condition1": concrete_value1, "condition2": concrete_value2, 
-                                                                "Result": satisfied['Result'], "Similarity": refinment['distance']})
-
-                                                                #if len(Concrete_values) == 40:
-                                                                    #found = True
-                                                                    #break
-
-
-        end_time = time.time()
-        Concrete_values_sorted = sorted(Concrete_values, key=lambda x: x['Similarity'])
-
-        satisfied_conditions_df = pd.DataFrame(satisfied_conditions)
-        satisfied_conditions_df.to_csv("satisfied_conditions__Ranges_Partial.csv", index=False)
-
+                        for item in Concrete_values_list:
+                            key = (item['Similarity'], tuple(item['conditions']))
+                            if key not in seen:
+                                seen.add(key)
+                                unique_concrete_values.append(item)
+                        
+                        # Sort once all unique values are added
+                        Concrete_values_sorted = sorted(unique_concrete_values, key=lambda x: (x['Similarity'], x['conditions']))
+                        Concrete_values_sorted = Concrete_values_sorted[:result_num]
+                    
+                    if result_num != "all":
+                        if next_range_min_distance > max([d['Similarity'] for d in Concrete_values_sorted]):
+                            if len(Concrete_values_sorted) >= result_num:
+                                break # stop and take top-k
+                processing_time2 += (time.time() - processing_start_time2)
+  
+        elapsed_time = time.time() - start_time
+ 
+        # Create a DataFrame from the filtered satisfied_conditions   
+        #satisfied_conditions_df = pd.DataFrame(satisfied_conditions)
+        #satisfied_conditions_df.to_csv("satisfied_conditions__Ranges.csv", index=False)
+        Concrete_values_sorted = Concrete_values_sorted if 'Concrete_values_sorted' in locals() else []
         satisfied_conditions_concrete_df = pd.DataFrame(Concrete_values_sorted)
-        satisfied_conditions_concrete_df.to_csv("satisfied_conditions__Ranges_Concerete.csv", index=False)
-        elapsed_time = end_time - start_time
-
+        output_directory = "/Users/Shatha/Downloads/Query_Refinment_Shatha/sh_Final1"
+        # For the second file
+        file_path_2 = os.path.join(
+            output_directory, 
+            f"satisfied_conditions_Ranges_{dataName}_size{datasize}_query{query_num}_constraint{constraint}.csv"
+        )
+        satisfied_conditions_concrete_df.to_csv(file_path_2, index=False)
+        
         info = []
         refinement_info = {
             "Data Name": dataName,
             "Data Size": datasize,
-            "Access No.": counter,
+            "Query No.": query_num,
+            "Type": "Ranges",
+            "Top-K": result_num,
+            "Combinations No.": combination,
+            "Distance": round(check_counter / combination * 100, 3),
+            "Access No.": counter + child_counter,
             "Checked No.": check_counter,
             "Refinement No.": refinement_counter,
-            "Time": round(elapsed_time, 3)
+            "Time": round(elapsed_time, 3),
+            "Constraint Width": round(constraint[1]-constraint[0], 2),
+            "Solutions Count": solutions_count,
+            "Constraint": constraint,
+            #"Distribution": distribution,
+            #"Correlation": Correlation,
+            "Query": UserpredicateList,
+            "Range Evaluation Time": round(full_time, 3),
+            "Division Time": round(Division_time,3),
+            "Single Time": round(single_time, 3),
+            "Processing Time": round(processing_time1 + processing_time2, 3)
         }
         info.append(refinement_info)
-        # Save info to CSV
         info_df = pd.DataFrame(info)
-        info_df.to_csv("Fully_info.csv", mode='a', index=False, header=False)
+        output_directory = "/Users/Shatha/Downloads/Query_Refinment_Shatha/sh_Final1"
+        # Ensure the directory exists
+        os.makedirs(output_directory, exist_ok=True)
 
-        print("Number of boxes access: ", counter+child_counter)
-        print("Number of checked", check_counter)
-        print("Number of refinments", refinement_counter)
-        #print("Number of child clusters access: ", child_counter)
-        #print("Number of Aggregation calculated: ", agg_counter)
-        #print("Number of Ranges: ", ranges_counter)
-        print("Time taken Overall for Partial filtered clusters:", round(elapsed_time, 3), "seconds") 
-        
+        # Define the full file path including the directory
+        file_path = os.path.join(output_directory, f"Run_info_{dataName}_size{datasize}_H.csv")
 
+        write_header = not os.path.exists(file_path)  # Write header only if the file does not exist
 
-    def filter_clusters_partial_modified(self, cluster_key, parent_child_map, cluster_map, filtered_clusters, condition1, operator1, condition2, operator2, counter, child_counter, coverage_threshold=75):
+        info_df.to_csv(file_path, mode='a', index=False, header=write_header)
+
+        print("Number of boxes accessed:", counter + child_counter)
+        print("Number of checks:", check_counter)
+        print("Number of refinements:", refinement_counter)
+        print("Partial Time:", round(Division_time, 3), "seconds")
+        print("Time taken Overall:", round(elapsed_time, 3), "seconds")
+
+    def filter_clusters_partial_modified(self, cluster_key, parent_child_map, cluster_map, filtered_clusters, conditions, operators, counter, child_counter):
         stack = [cluster_key]
-
-        cond1_min, cond1_max = condition1
-        cond2_min, cond2_max = condition2
 
         while stack:
             counter += 1
             cluster_key = stack.pop()
             cluster_info = cluster_map[cluster_key]
 
+            # Extract relevant data
+            data_Min = cluster_info['Data_Min']
+            data_Max = cluster_info['Data_Max']
+
+            # Check if this cluster fully satisfies all conditions
+            fully_satisfies = True
+            partially_satisfies = True
+
+            for i, (condition, operator) in enumerate(zip(conditions, operators)):
+                if not self.applyOperator.apply_operator_ranges(data_Min[i], data_Max[i], condition['range'][0], condition['range'][1], operator, "Full"):
+                    fully_satisfies = False
+                if not self.applyOperator.apply_operator_ranges(data_Min[i], data_Max[i], condition['range'][0], condition['range'][1], operator, "Partial"):
+                    partially_satisfies = False
+                    break  # If any condition is not partially satisfied, stop checking
+
             # Check if this cluster fully satisfies the conditions
-            if self.applyOperator.apply_operator_ranges(cluster_info['Data_Min'][0], cluster_info['Data_Max'][0], cond1_min, cond1_max, operator1, "Full") and self.applyOperator.apply_operator_ranges(
-                cluster_info['Data_Min'][1], cluster_info['Data_Max'][1], cond2_min, cond2_max, operator2, "Full"):
+            if fully_satisfies:
                 cluster_info['Satisfy'] = 'Full' 
                 filtered_clusters.append(cluster_info)
-                      
-            # Partially satisfying
-            elif self.applyOperator.apply_operator_ranges(cluster_info['Data_Min'][0],  cluster_info['Data_Max'][0], cond1_min, cond1_max, operator1, "Partial") and self.applyOperator.apply_operator_ranges(
-                cluster_info['Data_Min'][1], cluster_info['Data_Max'][1], cond2_min, cond2_max, operator2, "Partial"): 
-                
-                if cluster_key in parent_child_map: 
-                    child_list = []
+
+            elif partially_satisfies:
+                if cluster_key in parent_child_map:
                     for child_key in parent_child_map[cluster_key]:
+
                         child_counter+=1
                         child_info = cluster_map[child_key]
+                        child_Min = child_info['Data_Min']
+                        child_Max = child_info['Data_Max']
+
+                        # Check if the child fully satisfies the conditions
+                        child_fully_satisfies = True
+                        child_partially_satisfies = True
+
+                        for i, (condition, operator) in enumerate(zip(conditions, operators)):
+                            if not self.applyOperator.apply_operator_ranges(child_Min[i], child_Max[i], condition['range'][0], condition['range'][1], operator, "Full"):
+                                child_fully_satisfies = False
+                            if not self.applyOperator.apply_operator_ranges(child_Min[i], child_Max[i], condition['range'][0], condition['range'][1], operator, "Partial"):
+                                child_partially_satisfies = False
+                                break
+
 
                         # Fully satisfying child
-                        if self.applyOperator.apply_operator_ranges(child_info['Data_Min'][0],  child_info['Data_Max'][0], cond1_min, cond1_max, operator1, "Full") and self.applyOperator.apply_operator_ranges(
-                            child_info['Data_Min'][1], child_info['Data_Max'][1], cond2_min, cond2_max, operator2, "Full"):
+                        if child_fully_satisfies:
                             child_info['Satisfy'] = 'Full'
-                            child_list.append({"satysfying": "full", "child": child_info})
+                            filtered_clusters.append(child_info)
 
                         # Partial child
-                        elif self.applyOperator.apply_operator_ranges(child_info['Data_Min'][0],  child_info['Data_Max'][0], cond1_min, cond1_max, operator1, "Partial") and self.applyOperator.apply_operator_ranges(
-                            child_info['Data_Min'][1], child_info['Data_Max'][1], cond2_min, cond2_max, operator2, "Partial"): 
-                            child_info['Satisfy'] = 'Partial'
+                        elif child_partially_satisfies:
+                            stack.append(child_key)
 
-                            child_list.append({"satysfying": "partial", "child": [child_key]})
-
-
-                    for child in child_list:
-                            if child['satysfying'] == "partial":
-                                stack.extend(child["child"])
-
-                            elif child['satysfying'] == "full":
-                                filtered_clusters.append(child["child"])
-                      
                 else:
                     cluster_info['Satisfy'] = 'Partial'
                     filtered_clusters.append(cluster_info)
-                      
-                   
-            #Not satisfying cluster   
+
             else:
-                # If the cluster does not satisfy the condition, we explore its children if any
                 stack.extend(parent_child_map.get(cluster_key, []))
         
         return filtered_clusters, counter, child_counter
-
