@@ -59,7 +59,6 @@ class constraint_evaluation:
             result =  x / y 
         else: 
             result = 0
-            #raise ZeroDivisionError("Division by interval containing zero is undefined")  
         return result  
 
     def parse_and_evaluate_expression(self, filtered_df, expression):
@@ -115,8 +114,64 @@ class constraint_evaluation:
         
         # Finally evaluate the expression outside parentheses
         return evaluate(output)
+    
+    def evaluate_constraint1(self, filtered_df, expression, conditions, agg_counter, similarity, type, constraint_type, concrete_values=None):
+        
+        satisfied = []
+        Not_satisfied = False
+        result = None
+        np.seterr(invalid='ignore')
+        satisfies_all = False
 
-    def evaluate_constraint(self, filtered_df, expression, condition1, condition2, agg_counter, similarity, type, concerete_value1=0, concerete_value2=0):
+        data = pd.DataFrame(filtered_df)
+                    
+        if data.empty:
+            Not_satisfied = True
+            return satisfied, agg_counter, Not_satisfied, result
+        else:
+            try:
+                # Extract boundary values from the expression
+                lower_bound, upper_bound = self.extract_boundary_values(expression)
+
+                # Evaluate the exact result of the expression (SPD or another calculation)
+                core_expression = self.extract_core_expression(expression)
+                result = round(self.parse_and_evaluate_expression(data, core_expression), 4)
+                #print(conditions, result)
+                # Check if the result satisfies the boundary conditions for all conditions
+                if constraint_type == 1:
+                    satisfies_all = lower_bound <= result <= upper_bound
+                if constraint_type == 2:
+                    satisfies_all = result <= upper_bound
+
+                # Construct the satisfaction result based on the type and conditions
+                agg_counter += 1
+                if satisfies_all:
+                    if type == "ranges":
+                        satisfied = {
+                            "conditions": conditions,
+                            "Concrete Values": concrete_values,
+                            "Result": result,
+                            "Similarity": similarity,
+                            "Range Satisfaction": "Full"
+                        }
+                    else:
+                        satisfied = {
+                            "conditions": conditions,
+                            "Result": result,
+                            "Similarity": similarity,
+                            "Range Satisfaction": "Full"
+                        }
+                else:
+                    Not_satisfied = True    
+
+            except ZeroDivisionError:
+                pass
+
+            return satisfied, agg_counter, Not_satisfied, result
+
+
+    def evaluate_constraint(self, filtered_df, expression, condition1, condition2, condition3, agg_counter, similarity, type, concerete_value1=0, 
+    concerete_value2=0, concerete_value3=0):
         satisfied = []
         result = None
         np.seterr(invalid='ignore')
@@ -127,7 +182,7 @@ class constraint_evaluation:
             return satisfied, agg_counter
         else:
             try:
-                agg_counter += 1
+                #agg_counter += 1
                 # Extract boundary values from the expression
                 lower_bound, upper_bound = self.extract_boundary_values(expression)
 
@@ -143,6 +198,7 @@ class constraint_evaluation:
                         satisfied = {
                             "condition1": condition1, "Concrete Vlaues1": concerete_value1,
                             "condition2": condition2, "Concrete Vlaues2": concerete_value2,
+                            "condition3": condition3, "Concrete Vlaues3": concerete_value3,
                             "Result": result,
                             "Similarity": similarity,
                             "Range Satisfaction": "Full"
@@ -152,6 +208,7 @@ class constraint_evaluation:
                         satisfied = {
                             "condition1": condition1,
                             "condition2": condition2, 
+                            "condition2": condition3, 
                             "Result": result,
                             "Similarity": similarity,
                             "Range Satisfaction": "Full"
@@ -215,7 +272,108 @@ class constraint_evaluation:
             except ZeroDivisionError:
                 pass
             return satisfied, agg_counter
-      
+
+    def evaluate_constraint2(self, filtered_df, expression, condition1, condition2, agg_counter, similarity, type, concerete_value1=0, 
+        concerete_value2=0, concerete_value3=0):
+            satisfied = []
+            result = None
+            np.seterr(invalid='ignore')
+
+            data = pd.DataFrame(filtered_df)
+                    
+            if data.empty:
+                return satisfied, agg_counter
+            else:
+                #try:
+                    #agg_counter += 1
+                    # Extract boundary values from the expression
+                    lower_bound, upper_bound = self.extract_boundary_values(expression)
+
+                    # Evaluate the exact result of the expression (SPD or another calculation)
+                    # Extract the core expression and evaluate it explicitly
+                    core_expression = self.extract_core_expression(expression)
+                    result = round(self.parse_and_evaluate_expression(data, core_expression), 4)
+                    #print("condition1", condition1, "condition2", condition2, "Result:", result) 
+                
+                    # Check if the result satisfies the boundary conditions
+                    if type == "ranges":
+                        if lower_bound <= result <= upper_bound:
+                            satisfied = {
+                                "condition1": condition1, "Concrete Vlaues1": concerete_value1,
+                                "condition2": condition2, "Concrete Vlaues2": concerete_value2,
+                                "Result": result,
+                                "Similarity": similarity,
+                                "Range Satisfaction": "Full"
+                            }
+                    else:
+                        if lower_bound <= result <= upper_bound:
+                            satisfied = {
+                                "condition1": condition1,
+                                "condition2": condition2, 
+                                "Result": result,
+                                "Similarity": similarity,
+                                "Range Satisfaction": "Full"
+                            }
+
+                #except ZeroDivisionError:
+                    #pass
+                #print("condition1", condition1, "condition2", condition2, "Result:", result) 
+                
+                    return satisfied, agg_counter
+
+    def cardinality(self, filtered_df, counter, agg_counter, condition1, condition2):
+        satisfied = []
+
+        data = pd.DataFrame(filtered_df)
+        if data.empty:
+            return satisfied, agg_counter
+        else:
+            count_race1 = data['agg1'].sum()
+
+
+            if 1 <= count_race1 and count_race1 <= 4:
+                satisfied = {
+                    "condition1": condition1, 
+                    "condition2": condition2, 
+                    "Result": [round(count_race1,4), round(count_race1,4)],  # Store as a list
+                    "Range Satisfaction": "Full"
+                }  
+            elif (1 <= count_race1 <= 4 and 4 < count_race1) or (count_race1 <= 1 and 1 < count_race1 <= 4) or (
+                count_race1 <= 1 and  count_race1 >= 4):
+                satisfied = {
+                    "condition1": condition1, 
+                    "condition2": condition2, 
+                    "Result": [round(count_race1,4), round(count_race1,4)],  # Store as a list
+                    "Range Satisfaction": "Partial"
+                } 
+        return satisfied, agg_counter
+
+    def calculate_spd_fully(self, filtered_df, counter, agg_counter, condition1, condition2): #, similarity):
+        satisfied = []
+
+        if filtered_df.empty:
+            return satisfied, agg_counter
+        else:
+            agg_counter = agg_counter + 1
+            count_race1_positive = filtered_df['Race1 Positive'].sum()
+            count_race1 = filtered_df['Race1'].sum()
+            count_race2_positive = filtered_df['Race2 Positive'].sum()
+            count_race2 = filtered_df['Race2'].sum()
+
+            try:
+                # Calculate SPD
+                spd = round((count_race1_positive / count_race1) - (count_race2_positive / count_race2), 4)
+                #print("SPD for Fully filtered clusters = ", spd)
+                #if 0.0 <= spd <= 0.2:
+                satisfied = ({"condition1": condition1,
+                    "condition2": condition2,
+                          "SPD": spd, 
+                          "counter": counter})
+                          #"similarity": similarity})
+            except ZeroDivisionError:
+                pass
+            return satisfied, agg_counter
+           
 
     def calculate_spd_partially(self, filtered_df, condition1, condition2, agg_counter):
         satisfied = []  
