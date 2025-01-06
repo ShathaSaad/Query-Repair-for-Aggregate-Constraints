@@ -56,13 +56,16 @@ class constraint_evaluation1:
         # Return the list of unique column/aggregation names
         return list(set(matches))
 
-    def calculate_expression_partially(self, filtered_df, condition1, condition2, agg_counter, expression, type, similarity, most_similar1=0, most_similar2=0):
+    def calculate_expression_partially(self, filtered_df, conditions, agg_counter, expression, type, similarity, constraint_type, most_similar_values=0):
         satisfied = []  
+        not_satisfied = False
+        #print(conditions)
 
         data = pd.DataFrame(filtered_df)
 
         if data.empty:
-            return satisfied, agg_counter
+            not_satisfied = True
+            return satisfied, agg_counter, not_satisfied, " "
         else:
             agg_counter += 1
             # Initialize dictionaries for lower and upper bounds
@@ -100,9 +103,121 @@ class constraint_evaluation1:
             
             # Evaluate the expression tree using interval arithmetic
             result_lower, result_upper = self.evaluate_expression_tree(expression_tree, lower_bounds, upper_bounds)  
-            
             result_lower = round(result_lower,4)
             result_upper = round(result_upper,4)
+            Range_Result = [round(result_lower, 4), round(result_upper, 4)]
+            #print(Range_Result)
+            # Evaluate whether the result satisfies the condition
+            #if result_lower != None and result_upper != None:
+            if type == "ranges":
+                if constraint_type == 1:
+                    # Check if the result satisfies the boundary condition fully
+                    if lower_bound_value <= result_lower and result_upper <= upper_bound_value:
+                        satisfied = {
+                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
+                            "Range Satisfaction": "Full",
+                        }
+                        concrete_counts = 1
+                        # Dynamically add each condition and corresponding most_similar concrete values
+                        for i in range(len(conditions)):
+                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
+
+                        satisfied["concrete_counts"]= concrete_counts
+                    elif (
+                        (lower_bound_value <= result_lower <= upper_bound_value and upper_bound_value < result_upper) or
+                        (lower_bound_value <= result_upper <= upper_bound_value and lower_bound_value > result_lower) or
+                        (result_lower <= lower_bound_value and lower_bound_value < result_upper <= upper_bound_value) or
+                        (result_lower <= lower_bound_value and result_upper >= upper_bound_value)
+                    ):
+                        satisfied = {
+                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
+                            "Range Satisfaction": "Partial"
+                        }
+                        concrete_counts = 1
+                        # Dynamically add each condition and corresponding most_similar concrete values
+                        for i in range(len(conditions)):
+                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
+                    else:
+                        not_satisfied = True
+                elif constraint_type == 2:
+                    # Check if the result satisfies the boundary condition fully
+                    if result_upper <= upper_bound_value:
+                        satisfied = {
+                            "Result": [round(result_upper, 4)],  # Store result as a list
+                            "Range Satisfaction": "Full",
+                        }
+                        concrete_counts = 1
+                        # Dynamically add each condition and corresponding most_similar concrete values
+                        for i in range(len(conditions)):
+                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
+
+                        satisfied["concrete_counts"]= concrete_counts
+                    elif (result_lower <= upper_bound_value < result_upper):
+                        satisfied = {
+                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
+                            "Range Satisfaction": "Partial"
+                        }
+                        concrete_counts = 1
+                        # Dynamically add each condition and corresponding most_similar concrete values
+                        for i in range(len(conditions)):
+                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
+                    else:
+                        not_satisfied = True
+                        
+            #except ZeroDivisionError:
+                #pass
+
+            return satisfied, agg_counter, not_satisfied, Range_Result
+
+    def calculate_expression_partially1(self, filtered_df, condition1, condition2, agg_counter, expression, type, similarity, most_similar1=0, most_similar2=0):
+        satisfied = []  
+
+        data = pd.DataFrame(filtered_df)
+
+        if data.empty:
+            return satisfied, agg_counter
+        else:
+            #agg_counter += 1
+            # Initialize dictionaries for lower and upper bounds
+            lower_bounds = {}
+            upper_bounds = {}
+
+            # Extract boundary values from the expression
+            lower_bound_value, upper_bound_value = self.extract_boundary_values(expression)
+
+            # Dynamically extract aggregation column names from the expression
+            agg_columns = self.extract_column_names_from_expression(expression)
+
+            # Initialize lower and upper bounds for each aggregation column
+            for agg in agg_columns:
+                lower_bounds[agg] = 0
+                upper_bounds[agg] = 0
+
+            # Iterate over each row in the DataFrame
+            for _, row in data.iterrows():
+                if row['Satisfy'] == 'Full':
+                    # Use the values as both lower and upper bounds
+                    for agg in agg_columns:
+                        lower_bounds[agg] += row[agg]
+                        upper_bounds[agg] += row[agg]
+                elif row['Satisfy'] == 'Partial':
+                    # Use values as upper bounds, and 0 as lower bounds
+                    for agg in agg_columns:
+                        upper_bounds[agg] += row[agg]
+            #print(lower_bounds, upper_bounds)
+
+            #try: 
+            core_expression = self.extract_core_expression(expression)
+            # Parse the expression into a tree
+            expression_tree = self.parse_expression_to_tree(core_expression)
+            
+            # Evaluate the expression tree using interval arithmetic
+            result_lower, result_upper = self.evaluate_expression_tree(expression_tree, lower_bounds, upper_bounds)  
+            result_lower = round(result_lower,4)
+            result_upper = round(result_upper,4)
+
+            #print("[", condition1, "]", condition2, "Result: [", round(result_lower,4), round(result_upper,4), "]") 
+
             # Evaluate whether the result satisfies the condition
             #if result_lower != None and result_upper != None:
             if type == "partial":
@@ -111,7 +226,6 @@ class constraint_evaluation1:
                         "condition1": condition1,
                         "condition2": condition2, 
                         "Result": [round(result_lower,4), round(result_upper,4)],  # Store as a list
-                        "Similarity": similarity,
                         "Range Satisfaction": "Full"
                     }  
                     #print("condition1", condition1, "condition2", condition2, "Result: [", round(result_lower,4), round(result_upper,4), "]", "Full") 
@@ -122,8 +236,8 @@ class constraint_evaluation1:
                     satisfied = {
                         "condition1": condition1, 
                         "condition2": condition2, 
+                        #"condition3": condition3, 
                         "Result": [round(result_lower,4), round(result_upper,4)],  # Store as a list
-                        "Similarity": similarity,
                         "Range Satisfaction": "Partial"
                     }
                     #print("condition1", condition1, "condition2", condition2, "Result: [", round(result_lower,4), round(result_upper,4), "]", "Partial")   
@@ -135,6 +249,7 @@ class constraint_evaluation1:
                     satisfied = {
                         "condition1": condition1, "Concrete Vlaues1": most_similar1,
                         "condition2": condition2, "Concrete Vlaues2": most_similar2,
+                        #"condition3": condition3, "Concrete Vlaues3": most_similar3,
                         "Result": [round(result_lower,4), round(result_upper,4)],  # Store as a list
                         "Range Satisfaction": "Full"
                     }  
@@ -146,6 +261,7 @@ class constraint_evaluation1:
                     satisfied = {
                         "condition1": condition1, "Concrete Vlaues1": most_similar1,
                         "condition2": condition2, "Concrete Vlaues2": most_similar2,
+                        #"condition3": condition3, "Concrete Vlaues3": most_similar3,
                         "Result": [round(result_lower,4), round(result_upper,4)],  # Store as a list
                         "Range Satisfaction": "Partial"
                     } 
@@ -158,8 +274,6 @@ class constraint_evaluation1:
                 #pass
 
             return satisfied, agg_counter
-
-        
 
     def parse_expression_to_tree(self, expression):
         """
@@ -278,24 +392,26 @@ class constraint_evaluation1:
             #If numbers are positive this is correct
             lower_result = lower1 * lower2
             upper_result = upper1 * upper2
-            #If negative 
+            #If negative it will be different, Fix it
             
 
         elif operator == '/':
-            
             if lower2 == 0 and upper2 ==0:
                 upper_result = 0
                 lower_result = 0
-
-            elif lower2 <= 0 and upper2 >=0: #Fix this later for general constraints       
-                upper_result = 1
-                lower_result = 0
-
+            
+            #if lower2 <= 0 and upper2 >=0: #Fairness 
+                #print("I am here")   
+                #upper_result = 1
+                #lower_result = 0
+            elif lower2 == 0: #Others
+                upper_result =  upper1 
+                lower_result = lower1 / upper2 
+            elif upper2 ==0:
+                lower_result = lower1
+                upper_result = upper1 / lower2
             else:
                 upper_result = upper1 / lower2
-                lower_result = lower1 / upper2
-            
-            #if lower2 == 0  or upper2 == 0:
-                #raise ZeroDivisionError("Division by interval containing zero is undefined")                           
+                lower_result = lower1 / upper2                       
 
         return lower_result, upper_result
