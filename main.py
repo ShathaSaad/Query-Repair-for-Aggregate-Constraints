@@ -380,7 +380,6 @@ def constraint2_Cardinality(df, constraint):
         "agg1": 'count("race == 2")',
         "agg2": 'count("race == 1")'
     }
-    constraint_type = 2
     expression = f"agg1 - agg2 <= {constraint[1]}"
 
     # Evaluate individual aggregations
@@ -391,7 +390,7 @@ def constraint2_Cardinality(df, constraint):
     # Retrieve list of all columns used in the queries
     columns_used = evaluator.get_columns_used()
     
-    return columns_used, aggregations, expression, constraint_type
+    return columns_used, aggregations, expression
 
 def userQuery_TPCH_Q1(distribution, correlation, size, bin):
     query_num = 1
@@ -564,11 +563,11 @@ def main():
     # Define the possible configurations
     distributions = ['Non']#, 'normal', 'exponential'] 
     correlations = [[0.0, 0.0]]#, [0.3, 0.2], [0.8, 0.7]]
-    constraints = [[0, 600]]
+    constraints = [[0.0, 0.1]]
     #[[0.25, 0.5], [0.44, 0.5], [0.42, 0.5], [0.35, 0.5], [0.5, 0.6], [0.14, 0.17], [0.14, 0.15], [0.064, 0.069], [0.48, 0.5], [0.49, 0.5], [0.31, 0.36], [0.45, 0.54], [0.36, 0.43]]
 
     k = 7
-    sizes = [50000] #'1MB', '10MB', '100MB', '1GB'
+    sizes = [100] #'1MB', '10MB', '100MB', '1GB'
 
     bin_sizes = [0]
     
@@ -590,7 +589,7 @@ def main():
                             while count <= 1:
                                 constraint_columns, df_merged, df_constraint, corr_matrix, df_predicate, statistical_tree, cluster_tree, columns = [], [], [], [], [], [], [], []
                                 df_predicate = pd.DataFrame(df_original, columns=column_names)      # Convert to a Pandas DataFrame with dynamic column names
-                                constraint_columns, aggregations, expression, constraint_type = constraint2_Cardinality(df_original, constraint) # Extract the column names, aggregations and expression from the constraint
+                                constraint_columns, aggregations, expression = constraint1_Healthcare(df_original, constraint) # Extract the column names, aggregations and expression from the constraint
                                 df_constraint = pd.DataFrame(df_original, columns=constraint_columns)    
                                 df_merged = pd.concat([df_predicate, df_constraint], axis=1)        # Merging the dataframes (predicates columns with constraints columns) by their index
                                 cluster_tree = get_clusters(df_merged.values.tolist())
@@ -617,14 +616,14 @@ def main():
 
                                 print("\n\n--------------------------Full---------------------------\n")
                                 filter_fully = filtered_fully()
-                                filter_fully.check_predicates(sorted_possible_refinments1, statistical_tree, expression, dataSize, dataName, k, query_num, constraint, op.getPredicateList(), combination, distribution, correlated_pairs, constraint_type)
+                                filter_fully.check_predicates(sorted_possible_refinments1, statistical_tree, expression, dataSize, dataName, k, query_num, constraint, op.getPredicateList(), combination, distribution, correlated_pairs)
 
                                 print("\n\n--------------------Partial with Ranges-------------------\n")
                                 ranges = attributesRanges1()
                                 filter_ranges_partial = filtered_with_Ranges_generalize_topK1()
                                 filter_ranges_partial1 = filtered_with_Ranges_generlize_nlogn()
                                 all_pred_possible_Ranges= ranges.generatePossibleValues_equalWidth1(df_original, op.getPredicateList(), sorted_possible_refinments1)  
-                                filter_ranges_partial.check_predicates(statistical_tree, all_pred_possible_Ranges, sorted_possible_refinments1, expression, dataSize, dataName, k, op.getPredicateList(), query_num, constraint, combination, distribution, correlated_pairs, constraint_type)
+                                filter_ranges_partial.check_predicates(statistical_tree, all_pred_possible_Ranges, sorted_possible_refinments1, expression, dataSize, dataName, k, op.getPredicateList(), query_num, constraint, combination, distribution, correlated_pairs)
                                 
                                 # Generate a unique ID based on configuration
                                 #config_id = f"size{size}_constr{constraint[0]}-{constraint[1]}_dist{distribution}_corr{correlation[0]}{correlation[1]}"
