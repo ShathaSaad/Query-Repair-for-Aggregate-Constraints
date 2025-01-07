@@ -101,7 +101,7 @@ class filtered_with_Ranges_generalize_topK1:
         return Concrete_values_list, concrete_counter, combination_time
 
 
-    def check_predicates(self, statistical_tree, all_pred_possible_Ranges, sorted_possible_refinments, expression, datasize, dataName, result_num, UserpredicateList, query_num, constraint, combination, distribution, Correlation, constraint_type):
+    def check_predicates(self, statistical_tree, all_pred_possible_Ranges, sorted_possible_refinments, expression, datasize, dataName, result_num, UserpredicateList, query_num, constraint, combination, distribution, Correlation):
         Concrete_values_list = []
         combination_time = 0
         solutions_count = 0
@@ -175,7 +175,7 @@ class filtered_with_Ranges_generalize_topK1:
                 
                 check_counter += 1
                 satisfied, agg_counter, not_satisfied, Range_Result = self.evaluate_constraint1.calculate_expression_partially(
-                    filtered_clusters_list_df, current_ranges, agg_counter, expression, "ranges", "similarity", constraint_type, " ")
+                    filtered_clusters_list_df, current_ranges, agg_counter, expression, "ranges", "similarity", " ")
                 #print(satisfied, "---------------")
                 if satisfied and satisfied['Range Satisfaction'] == 'Full':
                     #print("SATISFY")
@@ -240,7 +240,7 @@ class filtered_with_Ranges_generalize_topK1:
                 check_counter += 1
                 satisfied, agg_counter, Not_satisfied, result = self.evaluate_constraint.evaluate_constraint1(
                     filtered_clusters, expression, [range['range'][0] for range in current_ranges], agg_counter, " ",
-                    "ranges", constraint_type)
+                    "ranges")
                 if satisfied != []:
                     #print("SATISFY")
                     refinement_counter += 1
