@@ -13,7 +13,7 @@ class filtered_fully:
     def __init__(self):
         self.applyOperator = operators()
 
-    def check_predicates(self, sorted_possible_refinements, statistical_tree, expression, datasize, dataName, result_num, query_num, constraint, predicates, combination, distribution, Correlation, constraint_type):
+    def check_predicates(self, sorted_possible_refinements, statistical_tree, expression, datasize, dataName, result_num, query_num, constraint, predicates, combination, distribution, Correlation):
         counter, i = 0, 0
         agg_counter = 0
         satisfied_conditions = []
@@ -64,7 +64,7 @@ class filtered_fully:
             evaluate_constraint = constraint_evaluation() 
             check_counter += 1
             #satisfied, agg_counter = evaluate_constraint.cardinality(filtered_df, counter, agg_counter, condition1, condition2)
-            satisfied, agg_counter, Not_satisfied, result = evaluate_constraint.evaluate_constraint1(filtered_df, expression, conditions, agg_counter, similarity, "full", constraint_type)
+            satisfied, agg_counter, Not_satisfied, result = evaluate_constraint.evaluate_constraint1(filtered_df, expression, conditions, agg_counter, similarity, "full")
 
             if satisfied != []:
                 #check_counter_satisfy += 1
