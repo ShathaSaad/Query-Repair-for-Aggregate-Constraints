@@ -166,7 +166,7 @@ class filtered_fully:
     counter, parent_child_map):
     
         stack = [current_key]
-        conditions1 = enumerate(zip(conditions, operators))
+        #conditions1 = enumerate(zip(conditions, operators))
 
 
         while stack:
@@ -178,7 +178,7 @@ class filtered_fully:
             fully_satisfies = True
 
             # Loop through each condition and operator
-            for idx, (condition, operator) in conditions1:
+            for idx, (condition, operator) in enumerate(zip(conditions, operators)):
                 data_min = current_cluster['Data_Min'][idx]  # Get the corresponding Data_Min value for this condition
                 data_max = current_cluster['Data_Max'][idx]  # Get the corresponding Data_Max value for this condition
                 
