@@ -375,16 +375,16 @@ class constraint_evaluation1:
                 upper_result = 0
                 lower_result = 0
             
-            #if lower2 <= 0 and upper2 >=0: #Fairness 
-                #print("I am here")   
-                #upper_result = 1
-                #lower_result = 0
-            elif lower2 == 0: #Others
-                upper_result =  upper1 
-                lower_result = lower1 / upper2 
-            elif upper2 ==0:
-                lower_result = lower1
-                upper_result = upper1 / lower2
+            if lower2 <= 0 and upper2 >=0: #Fairness 
+                upper_result = 1
+                lower_result = 0
+            
+            #elif lower2 == 0: #Others
+                #upper_result =  upper1 
+                #lower_result = lower1 / upper2 
+            #elif upper2 ==0:
+                #lower_result = lower1
+                #upper_result = upper1 / lower2
             else:
                 upper_result = upper1 / lower2
                 lower_result = lower1 / upper2                       
