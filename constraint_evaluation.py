@@ -115,7 +115,7 @@ class constraint_evaluation:
         # Finally evaluate the expression outside parentheses
         return evaluate(output)
     
-    def evaluate_constraint1(self, filtered_df, expression, conditions, agg_counter, similarity, type, constraint_type, concrete_values=None):
+    def evaluate_constraint1(self, filtered_df, expression, conditions, agg_counter, similarity, type, concrete_values=None):
         
         satisfied = []
         Not_satisfied = False
@@ -138,11 +138,8 @@ class constraint_evaluation:
                 result = round(self.parse_and_evaluate_expression(data, core_expression), 4)
                 #print(conditions, result)
                 # Check if the result satisfies the boundary conditions for all conditions
-                if constraint_type == 1:
-                    satisfies_all = lower_bound <= result <= upper_bound
-                if constraint_type == 2:
-                    satisfies_all = result <= upper_bound
-
+                satisfies_all = lower_bound <= result <= upper_bound
+            
                 # Construct the satisfaction result based on the type and conditions
                 agg_counter += 1
                 if satisfies_all:
