@@ -56,7 +56,7 @@ class constraint_evaluation1:
         # Return the list of unique column/aggregation names
         return list(set(matches))
 
-    def calculate_expression_partially(self, filtered_df, conditions, agg_counter, expression, type, similarity, constraint_type, most_similar_values=0):
+    def calculate_expression_partially(self, filtered_df, conditions, agg_counter, expression, type, similarity, most_similar_values=0):
         satisfied = []  
         not_satisfied = False
         #print(conditions)
@@ -110,59 +110,34 @@ class constraint_evaluation1:
             # Evaluate whether the result satisfies the condition
             #if result_lower != None and result_upper != None:
             if type == "ranges":
-                if constraint_type == 1:
-                    # Check if the result satisfies the boundary condition fully
-                    if lower_bound_value <= result_lower and result_upper <= upper_bound_value:
-                        satisfied = {
-                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
-                            "Range Satisfaction": "Full",
-                        }
-                        concrete_counts = 1
-                        # Dynamically add each condition and corresponding most_similar concrete values
-                        for i in range(len(conditions)):
-                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
+                # Check if the result satisfies the boundary condition fully
+                if lower_bound_value <= result_lower and result_upper <= upper_bound_value:
+                    satisfied = {
+                        "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
+                        "Range Satisfaction": "Full",
+                    }
+                    concrete_counts = 1
+                    # Dynamically add each condition and corresponding most_similar concrete values
+                    for i in range(len(conditions)):
+                        satisfied[f"condition{i + 1}"] = conditions[i]['range']
 
-                        satisfied["concrete_counts"]= concrete_counts
-                    elif (
-                        (lower_bound_value <= result_lower <= upper_bound_value and upper_bound_value < result_upper) or
-                        (lower_bound_value <= result_upper <= upper_bound_value and lower_bound_value > result_lower) or
-                        (result_lower <= lower_bound_value and lower_bound_value < result_upper <= upper_bound_value) or
-                        (result_lower <= lower_bound_value and result_upper >= upper_bound_value)
-                    ):
-                        satisfied = {
-                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
-                            "Range Satisfaction": "Partial"
-                        }
-                        concrete_counts = 1
-                        # Dynamically add each condition and corresponding most_similar concrete values
-                        for i in range(len(conditions)):
-                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
-                    else:
-                        not_satisfied = True
-                elif constraint_type == 2:
-                    # Check if the result satisfies the boundary condition fully
-                    if result_upper <= upper_bound_value:
-                        satisfied = {
-                            "Result": [round(result_upper, 4)],  # Store result as a list
-                            "Range Satisfaction": "Full",
-                        }
-                        concrete_counts = 1
-                        # Dynamically add each condition and corresponding most_similar concrete values
-                        for i in range(len(conditions)):
-                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
-
-                        satisfied["concrete_counts"]= concrete_counts
-                    elif (result_lower <= upper_bound_value < result_upper):
-                        satisfied = {
-                            "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
-                            "Range Satisfaction": "Partial"
-                        }
-                        concrete_counts = 1
-                        # Dynamically add each condition and corresponding most_similar concrete values
-                        for i in range(len(conditions)):
-                            satisfied[f"condition{i + 1}"] = conditions[i]['range']
-                    else:
-                        not_satisfied = True
+                    satisfied["concrete_counts"]= concrete_counts
+                elif (
+                    (lower_bound_value <= result_lower <= upper_bound_value and upper_bound_value < result_upper) or
+                    (lower_bound_value <= result_upper <= upper_bound_value and lower_bound_value > result_lower) or
+                    (result_lower <= lower_bound_value and lower_bound_value < result_upper <= upper_bound_value) or
+                    (result_lower <= lower_bound_value and result_upper >= upper_bound_value)
+                ):
+                    satisfied = {
+                        "Result": [round(result_lower, 4), round(result_upper, 4)],  # Store result as a list
+                        "Range Satisfaction": "Partial"
+                    }
+                    concrete_counts = 1
+                    # Dynamically add each condition and corresponding most_similar concrete values
+                    for i in range(len(conditions)):
+                        satisfied[f"condition{i + 1}"] = conditions[i]['range']
+                else:
+                    not_satisfied = True
                         
             #except ZeroDivisionError:
                 #pass
