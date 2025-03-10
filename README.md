@@ -13,12 +13,12 @@ Algorithms
 3-	Cluster range pruning (RP).
 
 Datasets
-We are using 3 datasets: 
--	ACSIncome and Healthcare in InputData file.
--	TPCH in TPC-H file.
+- We are using 3 datasets in Datasets folder: ACSIncome, Healthcare and TPCH.
+- Edit each dataset's path in Dataframe.py.
 
 How to run experiments
 -	Set the configuration in main.py such as the dataName, dataSize, QueryNumber, … etc.
+-	Change the outputDirectory which after running the main.py, will contains the output of each algorithm and summary table.
 -	Run main.py
 
 Where to find the paper
