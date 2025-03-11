@@ -1,25 +1,68 @@
-Efficient Query Repair for Aggregate Constraints
+📊 Efficient Query Repair for Aggregate Constraints
 
-Abstract
+📄 Abstract
 
+Query Repair for Aggregate Constraints introduces multiple algorithms designed to handle diverse datasets effectively.
 
+⚙️ Algorithms
 
+This project implements three algorithms for query repair:
 
+Brute Force Algorithm
 
+To test this algorithm, remove the comment in main.py.
 
-Algorithms
-1-	Brute force algorithm, to test it remove the comment in main.py.
-2-	Full cluster filtering Algorithm (FF)
-3-	Cluster range pruning (RP).
+Full Cluster Filtering Algorithm (FF)
 
-Datasets
-- We are using 3 datasets in Datasets folder: ACSIncome, Healthcare and TPCH.
-- Edit each dataset's path in Dataframe.py.
+Cluster Range Pruning Algorithm (RP)
 
-How to run experiments
--	Set the configuration in main.py such as the dataName, dataSize, QueryNumber, … etc.
--	Change the outputDirectory which after running the main.py, will contains the output of each algorithm and summary table.
--	Run main.py
+📂 Datasets
 
-Where to find the paper
-The technical report is exist at extended version.
+The project includes three datasets located in the Datasets folder:
+
+ACSIncome
+
+Healthcare
+
+TPCH
+
+🔧 Dataset Configuration
+
+Edit each dataset's path in the Dataframe.py file to match your directory structure.
+
+🚀 How to Run Experiments
+
+To run the experiments, follow these steps:
+
+Set Configuration:
+
+In main.py, specify parameters such as:
+
+dataName
+
+dataSize
+
+QueryNumber
+
+And other required configurations.
+
+Output Directory:
+
+Set the outputDirectory where results will be saved. This folder will contain:
+
+The output of each algorithm.
+
+A summary table consolidating the results.
+
+Run the Experiment:
+
+Execute the following command:
+
+python main.py
+
+📜 Where to Find the Paper
+
+The technical report is available in the extended version. For further details, please refer to the report.
+
+✅ For any questions or contributions, feel free to reach out or create a pull request!
+
