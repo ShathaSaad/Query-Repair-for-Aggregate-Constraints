@@ -64,5 +64,5 @@ python main.py
 
 The technical report is available in the extended version. For further details, please refer to the report.
 
-✅ For any questions or contributions, feel free to reach out or create a pull request!
+✅ For any questions or contributions, feel free to reach out!
 
